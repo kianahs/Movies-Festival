@@ -5,6 +5,8 @@ const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const { process_params } = require("express/lib/router");
 const fs = require("fs");
+const formidable = require("formidable");
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const SpeechToTextV1 = require("ibm-watson/speech-to-text/v1");
 const { IamAuthenticator } = require("ibm-watson/auth");
 const LanguageTranslatorV3 = require("ibm-watson/language-translator/v3");
@@ -114,84 +116,6 @@ app.get("/:movieId/comments/:lang", function (request, response) {
   });
 });
 
-app.post("/:movieId/addComment", async function (request, response) {
-  var commentCounter = 0;
-  commentsSchema.find({}).exec(function (error, result) {
-    filtered_comments = result.filter((comment) => {
-      if (comment.movie_id == request.params.movieId) return comment;
-    });
-    // response.json(result);
-    // console.log(filtered_comments);
-    commentCounter = filtered_comments.length;
-    const params = {
-      objectMode: true,
-      contentType: "audio/mp3",
-      model: "en-US_BroadbandModel",
-      maxAlternatives: 1,
-    };
-
-    // Create the stream.
-    const recognizeStream = speechToText.recognizeUsingWebSocket(params);
-
-    // Pipe in the audio.
-    // console.log(request.body.content, typeof request.body.content);
-    // const adr = request.params.content.toString
-    fs.createReadStream(
-      __dirname + "/voiceComments/" + request.body.content
-    ).pipe(recognizeStream);
-    // audioFile.pipe(recognizeStream);
-    recognizeStream.on("data", function (event) {
-      console.log(JSON.stringify(event, null, 2));
-      // console.log(typeof event);
-      const analyzeParams = {
-        features: {
-          keywords: {
-            emotion: true,
-            sentiment: true,
-            limit: 1,
-          },
-        },
-        text: event["results"][0]["alternatives"][0]["transcript"],
-      };
-
-      naturalLanguageUnderstanding
-        .analyze(analyzeParams)
-        .then((analysisResults) => {
-          console.log(JSON.stringify(analysisResults, null, 2));
-          if (
-            analysisResults["result"]["keywords"][0]["emotion"]["anger"] < 0.6
-          ) {
-            const newComment = new commentsSchema({
-              id: commentCounter + 1,
-              movie_id: request.params.movieId,
-              username: request.body.username,
-              content: event["results"][0]["alternatives"][0]["transcript"],
-            });
-
-            newComment.save();
-          }
-          updated_filtered_comments = result.filter((comment) => {
-            if (comment.movie_id == request.params.movieId) return comment;
-          });
-
-          response.render("movieComments", {
-            result: updated_filtered_comments,
-          });
-        })
-        .catch((err) => {
-          console.log("error:", err);
-        });
-    });
-    recognizeStream.on("error", function (event) {
-      console.log(JSON.stringify(event, null, 2));
-      response.sendStatus(400);
-    });
-    recognizeStream.on("close", function (event) {
-      console.log(JSON.stringify(event, null, 2));
-    });
-  });
-});
-
 app.get("/:movieId/newCommentForm", function (request, response) {
   response.render("commentForm", { movieId: request.params.movieId });
 });
@@ -210,91 +134,224 @@ app.get("/:movieId/showComments", function (request, response) {
   });
 });
 
-// function translateComment(comment) {
-//   const translateParams = {
-//     text: comment,
-//     modelId: "en-fr",
-//   };
+app.get("/test", (req, res) => {
+  res.send(`
+    <h2>With <code>"express"</code> npm package</h2>
+    <form action="/api/upload" enctype="multipart/form-data" method="post">
+      <div>Text field title: <input type="text" name="title" /></div>
+      <div>File: <input type="file" name="someExpressFiles" multiple="multiple" /></div>
+      <input type="submit" value="Upload" />
+    </form>
+  `);
+});
 
-//   languageTranslator
-//     .translate(translateParams)
-//     .then((translationResult) => {
-//       console.log(JSON.stringify(translationResult, null, 2));
-//     })
-//     .catch((err) => {
-//       console.log("error:", err);
+app.post("/api/upload", (req, res, next) => {
+  const form = formidable({
+    multiples: true,
+    uploadDir: __dirname + "/voiceComments",
+  });
+
+  form.parse(req, (err, fields, files) => {
+    console.log(files.someExpressFiles.path, files.someExpressFiles.name);
+    fs.rename(
+      files.someExpressFiles.path,
+      form.uploadDir + "/" + files.someExpressFiles.name,
+      function (err, data) {
+        console.log(err, data);
+      }
+    );
+
+    if (err) {
+      next(err);
+      return;
+    }
+    res.json({ fields, files });
+  });
+});
+
+app.post("/:movieId/addComment", async function (request, response, next) {
+  var commentCounter = 0;
+  commentsSchema.find({}).exec(function (error, result) {
+    console.log(request.params);
+    filtered_comments = result.filter((comment) => {
+      if (comment.movie_id == request.params.movieId) return comment;
+    });
+
+    commentCounter = filtered_comments.length;
+    const form = formidable({
+      multiples: true,
+      uploadDir: __dirname + "/voiceComments",
+    });
+    console.log(request.params);
+    form.parse(request, async (err, fields, files) => {
+      // console.log(files.content.path, files.content.name, fields);
+      fs.rename(
+        files.content.path,
+        form.uploadDir + "/" + files.content.name,
+        function (err, data) {
+          console.log(err, data);
+        }
+      );
+
+      if (err) {
+        next(err);
+        return;
+      }
+      // res.json({ fields, files });
+
+      const params = {
+        objectMode: true,
+        contentType: "audio/" + fields.audioType,
+        model: "en-US_BroadbandModel",
+        maxAlternatives: 1,
+      };
+
+      // Create the stream.
+      const recognizeStream = speechToText.recognizeUsingWebSocket(params);
+
+      // Pipe in the audio.
+      // console.log(fields.content, typeof fields.content);
+      // const adr = request.params.content.toString
+
+      // console.log(__dirname + "/voiceComments/" + files.content.name);
+      await sleep(5000);
+      fs.createReadStream(
+        __dirname + "/voiceComments/" + files.content.name
+      ).pipe(recognizeStream);
+      // audioFile.pipe(recognizeStream);
+      recognizeStream.on("data", function (event) {
+        console.log(JSON.stringify(event, null, 2));
+        // console.log(typeof event);
+        const analyzeParams = {
+          features: {
+            keywords: {
+              emotion: true,
+              sentiment: true,
+              limit: 1,
+            },
+          },
+          text: event["results"][0]["alternatives"][0]["transcript"],
+        };
+        console.log(request.params);
+
+        naturalLanguageUnderstanding
+          .analyze(analyzeParams)
+          .then((analysisResults) => {
+            console.log(JSON.stringify(analysisResults, null, 2));
+            if (
+              analysisResults["result"]["keywords"][0]["emotion"]["anger"] < 0.6
+            ) {
+              const newComment = new commentsSchema({
+                id: commentCounter + 1,
+                movie_id: request.params.movieId,
+                username: fields.username,
+                content: event["results"][0]["alternatives"][0]["transcript"],
+              });
+
+              newComment.save();
+            }
+            commentsSchema.find({}).exec(function (error, res) {
+              updated_filtered_comments = res.filter((comment) => {
+                if (comment.movie_id == request.params.movieId) return comment;
+              });
+
+              response.render("movieComments", {
+                result: updated_filtered_comments,
+              });
+            });
+          })
+          .catch((err) => {
+            console.log("error:", err);
+          });
+      });
+      recognizeStream.on("error", function (event) {
+        console.log(JSON.stringify(event, null, 2));
+        response.sendStatus(400);
+      });
+      recognizeStream.on("close", function (event) {
+        console.log(JSON.stringify(event, null, 2));
+      });
+    });
+  });
+});
+
+// app.post("/:movieId/addComment", async function (request, response) {
+//   var commentCounter = 0;
+//   commentsSchema.find({}).exec(function (error, result) {
+//     filtered_comments = result.filter((comment) => {
+//       if (comment.movie_id == request.params.movieId) return comment;
 //     });
-// }
-// app.get("/", function (request, response) {
-//   response.send("hello world!");
-// });
+//     // response.json(result);
+//     // console.log(filtered_comments);
+//     // console.log(request.body.audioType);
+//     commentCounter = filtered_comments.length;
+//     const params = {
+//       objectMode: true,
+//       contentType: "audio/" + request.body.audioType,
+//       model: "en-US_BroadbandModel",
+//       maxAlternatives: 1,
+//     };
 
-// app.get("/test", function (request, response) {
-//   translateComment([
-//     "hey who are you today",
-//     "the best movie I have ever seen",
-//   ]);
-// });
+//     // Create the stream.
+//     const recognizeStream = speechToText.recognizeUsingWebSocket(params);
 
-// app.get("/home", function (request, response) {
-//   response.render("index");
-// });
+//     // Pipe in the audio.
+//     // console.log(request.body.content, typeof request.body.content);
+//     // const adr = request.params.content.toString
+//     fs.createReadStream(
+//       __dirname + "/voiceComments/" + request.body.content
+//     ).pipe(recognizeStream);
+//     // audioFile.pipe(recognizeStream);
+//     recognizeStream.on("data", function (event) {
+//       console.log(JSON.stringify(event, null, 2));
+//       // console.log(typeof event);
+//       const analyzeParams = {
+//         features: {
+//           keywords: {
+//             emotion: true,
+//             sentiment: true,
+//             limit: 1,
+//           },
+//         },
+//         text: event["results"][0]["alternatives"][0]["transcript"],
+//       };
 
-// app.get("/addMovie", function (request, response) {
-//   // const newMovie = new moviesSchema({
-//   //   id: 1,
-//   //   name: "starwars",
-//   //   poster_url: "www.example.com",
-//   //   director: "ben afleck",
-//   // });
-//   // newMovie.save();
-//   const newComment = new commentsSchema({
-//     id: 1,
-//     movie_id: 1,
-//     username: "kiana",
-//     content: "Amazing movie",
-//   });
-//   newComment.save();
-//   const newComment2 = new commentsSchema({
-//     id: 2,
-//     movie_id: 3,
-//     username: "parsa",
-//     content: "boringggg :/",
-//   });
-//   newComment2.save();
-// });
-// async function speechToTextFunction(audioFile) {
-//   const params = {
-//     objectMode: true,
-//     contentType: "audio/flac",
-//     model: "en-US_BroadbandModel",
-//     maxAlternatives: 1,
-//   };
+//       naturalLanguageUnderstanding
+//         .analyze(analyzeParams)
+//         .then((analysisResults) => {
+//           console.log(JSON.stringify(analysisResults, null, 2));
+//           if (
+//             analysisResults["result"]["keywords"][0]["emotion"]["anger"] < 0.6
+//           ) {
+//             const newComment = new commentsSchema({
+//               id: commentCounter + 1,
+//               movie_id: request.params.movieId,
+//               username: request.body.username,
+//               content: event["results"][0]["alternatives"][0]["transcript"],
+//             });
 
-//   // Create the stream.
-//   const recognizeStream = speechToText.recognizeUsingWebSocket(params);
+//             newComment.save();
+//           }
+//           commentsSchema.find({}).exec(function (error, res) {
+//             updated_filtered_comments = res.filter((comment) => {
+//               if (comment.movie_id == request.params.movieId) return comment;
+//             });
 
-//   // Pipe in the audio.
-//   fs.createReadStream(audioFile).pipe(recognizeStream);
-//   // audioFile.pipe(recognizeStream);
-//   recognizeStream.on("data", async function (event) {
-//     console.log(JSON.stringify(event, null, 2));
+//             response.render("movieComments", {
+//               result: updated_filtered_comments,
+//             });
+//           });
+//         })
+//         .catch((err) => {
+//           console.log("error:", err);
+//         });
+//     });
+//     recognizeStream.on("error", function (event) {
+//       console.log(JSON.stringify(event, null, 2));
+//       response.sendStatus(400);
+//     });
+//     recognizeStream.on("close", function (event) {
+//       console.log(JSON.stringify(event, null, 2));
+//     });
 //   });
-//   recognizeStream.on("error", async function (event) {
-//     console.log(JSON.stringify(event, null, 2));
-//   });
-//   recognizeStream.on("close", async function (event) {
-//     console.log(JSON.stringify(event, null, 2));
-//   });
-// }
-// app.post("/add", function (request, response) {
-//   const newMovie = new moviesSchema({
-//     id: request.body.id,
-//     name: request.body.name,
-//     poster_url: request.body.url,
-//     director: request.body.director,
-//   });
-//   newMovie.save();
-
-//   response.sendStatus(200);
 // });

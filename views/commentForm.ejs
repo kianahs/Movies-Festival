@@ -46,13 +46,24 @@
   <body>
     <h3>Contact Form</h3>
     <div class="container">
-      <form action="/<%=movieId%>/addComment" method="post">
+      <form
+        action="/<%=movieId%>/addComment"
+        method="post"
+        enctype="multipart/form-data"
+      >
         <label for="username">Username</label>
         <input
           type="text"
           id="username"
           name="username"
           placeholder="Your username.."
+        />
+        <label for="audioType">Audio type</label>
+        <input
+          type="text"
+          id="audioType"
+          name="audioType"
+          placeholder="type of audio file.."
         />
         <label for="content">Content</label>
         <!-- <input type="text" id="content" name="content" /><br /><br /> -->
