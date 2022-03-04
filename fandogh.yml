@@ -1,0 +1,9 @@
+kind: ExternalService
+name: node-project
+spec:
+  image_pull_policy: Always
+  port: 5000
+  source:
+    context: .
+    node_version: '16'
+    project_type: nodejs

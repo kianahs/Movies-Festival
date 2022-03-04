@@ -134,41 +134,6 @@ app.get("/:movieId/showComments", function (request, response) {
   });
 });
 
-app.get("/test", (req, res) => {
-  res.send(`
-    <h2>With <code>"express"</code> npm package</h2>
-    <form action="/api/upload" enctype="multipart/form-data" method="post">
-      <div>Text field title: <input type="text" name="title" /></div>
-      <div>File: <input type="file" name="someExpressFiles" multiple="multiple" /></div>
-      <input type="submit" value="Upload" />
-    </form>
-  `);
-});
-
-app.post("/api/upload", (req, res, next) => {
-  const form = formidable({
-    multiples: true,
-    uploadDir: __dirname + "/voiceComments",
-  });
-
-  form.parse(req, (err, fields, files) => {
-    console.log(files.someExpressFiles.path, files.someExpressFiles.name);
-    fs.rename(
-      files.someExpressFiles.path,
-      form.uploadDir + "/" + files.someExpressFiles.name,
-      function (err, data) {
-        console.log(err, data);
-      }
-    );
-
-    if (err) {
-      next(err);
-      return;
-    }
-    res.json({ fields, files });
-  });
-});
-
 app.post("/:movieId/addComment", async function (request, response, next) {
   var commentCounter = 0;
   commentsSchema.find({}).exec(function (error, result) {
@@ -274,6 +239,41 @@ app.post("/:movieId/addComment", async function (request, response, next) {
     });
   });
 });
+
+// app.get("/test", (req, res) => {
+//   res.send(`
+//     <h2>With <code>"express"</code> npm package</h2>
+//     <form action="/api/upload" enctype="multipart/form-data" method="post">
+//       <div>Text field title: <input type="text" name="title" /></div>
+//       <div>File: <input type="file" name="someExpressFiles" multiple="multiple" /></div>
+//       <input type="submit" value="Upload" />
+//     </form>
+//   `);
+// });
+
+// app.post("/api/upload", (req, res, next) => {
+//   const form = formidable({
+//     multiples: true,
+//     uploadDir: __dirname + "/voiceComments",
+//   });
+
+//   form.parse(req, (err, fields, files) => {
+//     console.log(files.someExpressFiles.path, files.someExpressFiles.name);
+//     fs.rename(
+//       files.someExpressFiles.path,
+//       form.uploadDir + "/" + files.someExpressFiles.name,
+//       function (err, data) {
+//         console.log(err, data);
+//       }
+//     );
+
+//     if (err) {
+//       next(err);
+//       return;
+//     }
+//     res.json({ fields, files });
+//   });
+// });
 
 // app.post("/:movieId/addComment", async function (request, response) {
 //   var commentCounter = 0;
