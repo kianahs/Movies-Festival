@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+
+      input[type="text"],
+      select,
+      textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+        margin-top: 6px;
+        margin-bottom: 16px;
+        resize: vertical;
+      }
+
+      input[type="submit"] {
+        background-color: #04aa6d;
+        color: white;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      input[type="submit"]:hover {
+        background-color: #45a049;
+      }
+
+      .container {
+        border-radius: 5px;
+        background-color: #f2f2f2;
+        padding: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>Contact Form</h3>
+    <div class="container">
+      <form action="/<%=movieId%>/addComment" method="post">
+        <label for="username">Username</label>
+        <input
+          type="text"
+          id="username"
+          name="username"
+          placeholder="Your username.."
+        />
+        <label for="content">Content</label>
+        <!-- <input type="text" id="content" name="content" /><br /><br /> -->
+        <input type="file" id="myFile" name="content" />
+        <input type="submit" value="Submit" id="submitButton" />
+      </form>
+    </div>
+  </body>
+</html>
+
+<!-- <script>
+  const submitButton = document.querySelector("#submitButton");
+  const usernameField = document.querySelector("#username");
+  const contentField = document.querySelector("#content");
+  submitButton.addEventListener("click", async (e) => {
+    e.preventDefault();
+    try {
+      console.log("/<%movieId%>/addComment");
+      const response = await fetch("/1/addComment", {
+        method: "post",
+        body: {
+          // Your body
+          username: usernameField.value,
+          content: contentField.value,
+        },
+      });
+      console.log("Completed!", response);
+    } catch (err) {
+      console.error(`Error: ${err}`);
+    }
+  });
+  // submitButton.addEventListener("click", sendRequestToAPI);
+  // Sending and receiving data in JSON format using POST method
+  //
+  function sendRequestToAPI(e) {
+    console.log("INNNNNN");
+    e.preventDefault();
+    var xhr = new XMLHttpRequest();
+    var url = "/1/addComment";
+    xhr.open("POST", url, true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState === 4 && xhr.status === 200) {
+        var json = JSON.parse(xhr.responseText);
+        console.log(json.email + ", " + json.password);
+      }
+    };
+    var data = JSON.stringify({
+      username: usernameField.value,
+      content: contentField.value,
+    });
+    console.log("INNNNNN");
+    xhr.send(data);
+  }
+</script> -->
